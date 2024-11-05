@@ -1,0 +1,364 @@
+
+--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= prova
+
+
+--Qual a categoria que possui o produto com o maior número de dias entre a primeira
+--compra da categoria e a sua data limite de entrega?
+--R: Utilidades_domesticas
+SELECT
+	p.product_category_name,
+	DATE ( o.order_purchase_timestamp ) AS dataCompra,
+	DATE ( oi.shipping_limit_date ) AS entregaLimite,
+	JULIANDAY (DATE ( oi.shipping_limit_date )) - JULIANDAY( DATE ( o.order_purchase_timestamp )) AS totalDias
+FROM products p 
+INNER JOIN order_items oi ON ( p.product_id = oi.product_id )
+INNER JOIN orders o ON ( o.order_id = oi.order_id )
+ORDER BY JULIANDAY (DATE ( oi.shipping_limit_date )) - JULIANDAY( DATE ( o.order_purchase_timestamp )) desc
+ 
+
+--Qual o nome da categoria com o maior número de pedidos realizados no banco de dados?
+--R:  Cama, Mesa e Banho
+SELECT
+	COUNT (oi.order_id) AS totalProdutos,
+	p.product_category_name 
+FROM order_items oi INNER JOIN products p ON ( p.product_id = oi.product_id ) 
+GROUP BY p.product_category_name
+HAVING p.product_category_name IS NOT NULL
+ORDER BY COUNT (oi.order_id) desc
+
+
+-- Qual a categoria com maior soma dos preços de produtos?
+-- beleza_saude
+SELECT
+	SUM (oi.price) AS somaProdutos,
+	p.product_category_name 
+FROM order_items oi INNER JOIN products p ON ( p.product_id = oi.product_id ) 
+GROUP BY p.product_category_name
+ORDER BY SUM (oi.price) DESC
+
+--Qual o código do produto mais caro da categoria agro indústria & comercio?
+-- R: 2b69866f22de8dad69c976771daba91c
+SELECT
+	p.product_id AS codigo,
+	oi.price AS preco
+FROM order_items oi INNER JOIN products p ON ( p.product_id = oi.product_id )
+WHERE p.product_category_name IN ('agro_industria_e_comercio')
+ORDER BY oi.price desc
+
+
+--Qual a ordem correta das 3 categorias com os produtos mais caros?
+-- R: Utilidade doméstica, pcs e artes
+SELECT
+	p.product_category_name AS product_category_name,
+	oi.price AS preco
+FROM order_items oi INNER JOIN products p ON ( p.product_id = oi.product_id )
+ORDER BY oi.price desc
+
+
+-- Qual o valor dos produtos mais caros das categorias: bebes, flores e seguros e serviços, respectivamente:
+-- R: 3.899 65,9 183,29
+SELECT
+	p.product_category_name,
+	MAX ( oi.price )  AS preco
+FROM order_items oi INNER JOIN products p ON ( p.product_id = oi.product_id )
+WHERE p.product_category_name IN ('bebes', 'flores', 'seguros_e_servicos')
+GROUP BY p.product_category_name
+
+
+
+--7. Quantos pedidos possuem um único comprador, 3 produtos e o pagamento foi dividido
+--em 10 parcelas? ***************
+SELECT 
+	COUNT(*) AS totalPedidos
+FROM (
+	SELECT 	
+		COUNT (DISTINCT o.customer_id) 
+	FROM order_items oi 
+	INNER JOIN orders o ON (oi.order_id = o.order_id) 
+	INNER JOIN order_payments op ON (op.order_id = o.order_id)
+	INNER JOIN products p ON (oi.product_id = p.product_id)
+	WHERE op.payment_installments = 10
+	GROUP BY o.customer_id 
+	HAVING COUNT (oi.product_id ) = 3
+) AS qr
+
+
+
+SELECT 
+    COUNT(*) AS total_linhas
+FROM (
+    SELECT 
+        o.order_id
+    FROM orders o
+    INNER JOIN order_items oi ON o.order_id = oi.order_id
+    INNER JOIN order_payments op ON o.order_id = op.order_id
+    INNER JOIN (
+        SELECT order_id
+        FROM order_items
+        GROUP BY order_id
+        HAVING COUNT(DISTINCT product_id) = 3
+    ) AS orders_with_3_products ON o.order_id = orders_with_3_products.order_id
+    WHERE op.payment_installments = 10
+    GROUP BY o.customer_id
+    HAVING COUNT(DISTINCT o.customer_id) = 1
+) AS result
+
+
+--8. Quantos pedidos foram parcelados em mais de 10 vezes ?
+-- R: 341
+SELECT 
+	COUNT (op.order_id)
+FROM order_payments op 
+WHERE payment_installments > 10
+
+
+-- 9, 10, 11, 12, 13
+--1	11858
+--2	3235
+--3	8287
+--4	19200
+--5	57420
+SELECT
+or2.review_score,
+COUNT (or2.review_score)
+FROM order_reviews or2
+INNER JOIN orders o ON (o.order_id = or2.order_id)
+GROUP BY or2.review_score
+
+
+
+-- 14. No dia 2 de Outubro de 2016, qual era o valor da média móvel dos últimos 7 dias?
+-- R: U$ 52.48
+
+
+SELECT 
+	o.order_purchase_timestamp,
+	oi.price,
+	AVG (oi.price) OVER (ORDER BY o.order_purchase_timestamp ASC 
+						  ROWS BETWEEN 7 PRECEDING AND CURRENT ROW ) AS avg_7_days
+FROM orders o INNER JOIN order_items oi ON (o.order_id = oi.order_id) WHERE DATE(o.order_purchase_timestamp) <= '2016-10-02'
+
+
+
+--15. No dia 5 de Outubro de 2016 as 08:04:21, qual era o valor da média móvel dos últimos
+-- 14 dias? *******************
+--R:
+
+SELECT 
+	o.order_purchase_timestamp,
+	oi.price,
+	AVG (oi.price) OVER (ORDER BY o.order_purchase_timestamp ASC 
+						  ROWS BETWEEN 14 PRECEDING AND CURRENT ROW ) AS avg_14_days
+FROM orders o INNER JOIN order_items oi ON (o.order_id = oi.order_id) WHERE o.order_purchase_timestamp <= '2016-10-05 08:04:21'
+
+
+
+-- Qual o código do produto da categoria agro indústria e comércio que está na 5
+--posição do ranking de produtos mais caros dessa categoria?
+-- R: d5dbb4d9ecbbf2e312169e4c8f1b57f0
+SELECT 
+	p.product_id,
+	oi.price 
+FROM products p INNER JOIN order_items oi ON (oi.product_id = p.product_id)
+WHERE p.product_category_name = 'agro_industria_e_comercio'
+ORDER BY oi.price desc
+LIMIT 1 OFFSET 4
+
+
+--17. Qual o código do produto da categoria artes que está na posição 1 do ranking de
+--produtos mais caros dessa categoria?
+-- R: 1bdf5e6731585cf01aa8169c7028d6ad
+SELECT 
+	p.product_id,
+	oi.price 
+FROM products p INNER JOIN order_items oi ON (oi.product_id = p.product_id)
+WHERE p.product_category_name = 'artes'
+ORDER BY oi.price desc
+LIMIT 1 OFFSET 0
+
+
+
+
+
+-- 18. Qual o valor da soma de todos que estão acima da posição 5 do ranking de produtos
+--mais caros da categoria brinquedos ***************
+SELECT 
+		DISTINCT p.product_id,
+		p.product_category_name,
+		oi.price,
+		ROW_NUMBER () OVER ( PARTITION BY p.product_category_name ORDER BY oi.price desc) AS price_rank
+	FROM products p INNER JOIN order_items oi ON (oi.product_id = p.product_id)
+	WHERE p.product_category_name = 'brinquedos'
+	GROUP BY p.product_id
+	
+	
+	
+	
+WITH ranked_products  AS (
+	SELECT 
+		DISTINCT p.product_id,
+		p.product_category_name,
+		oi.price,
+		ROW_NUMBER () OVER ( PARTITION BY p.product_category_name ORDER BY oi.price desc) AS price_rank
+	FROM products p JOIN order_items oi ON (oi.product_id = p.product_id)
+	WHERE p.product_category_name = 'brinquedos'
+)
+SELECT 
+	SUM(price)
+FROM ranked_products
+WHERE price_rank < 5
+
+
+
+
+
+-- Quantos clientes que fizeram pedidos antes do dia 5 de outubro de 2016 e foram cancelados -- Resposta da prova era 2*
+
+-- clientes
+-- pedidos
+-- DATA anterior a 5-10-2016
+-- status - cancelado
+
+
+SELECT count (c.customer_id), 
+		order_purchase_timestamp 
+FROM orders o 
+INNER JOIN customer c ON (c.customer_id = o.customer_id)
+WHERE order_status = 'canceled' 
+AND DATE(order_purchase_timestamp) < '2016-10-05' 
+GROUP BY o.order_id 
+ORDER BY order_purchase_timestamp 
+
+
+
+SELECT DISTINCT (customer_id),
+		order_status,
+		order_purchase_timestamp 
+FROM orders o 
+WHERE order_status = 'canceled' AND DATE(order_purchase_timestamp) < '2016-10-05' 
+GROUP BY o.order_id 
+ORDER BY order_purchase_timestamp 
+
+
+
+
+
+
+
+
+
+
+-- Quantos clientes que fizeram pedidos antes do dia 5 de outubro de 2016 e foram cancelados -- Resposta da prova era 2*
+
+
+
+
+
+
+
+
+--=-==-=-=-=
+
+-- >>>>>>>>>>>>>>>>>PRINCIPAL QUERY <<<<<<<<<<<<<<<<<--
+SELECT 
+p.product_category_name,
+COUNT(p.product_id) AS qtd_produtos,
+oi.price AS preco_original,
+--INICIO CONDICIONAL IF COM OBJETIVO DE APLICAR DESCONTO DIRETAMENTE
+CASE 
+        WHEN p.product_category_name = 'livros_tecnicos' THEN oi.price * 0.90  -- 10% de desconto
+        WHEN p.product_category_name = 'pet_shop' THEN oi.price * 0.80         -- 20% de desconto
+        WHEN p.product_category_name = 'pc_gamer' THEN oi.price * 1.50         -- 50% de aumento
+        WHEN p.product_category_name = 'tablets_impressao_imagem' THEN oi.price * 1.10 -- 10% de aumento
+        WHEN p.product_category_name = 'fashion_esporte' THEN oi.price * 1.05          -- 5% de aumento
+        ELSE oi.price -- Se não se encaixar em nenhuma categoria, mantém o preço original
+    END AS novo_preco,
+    --FIM CONDICIONAL IF
+    -- INICIO CONDICIONAL IF 2  para comparacao entre o preço original e o novo preco
+    CASE 
+    -- comparacao( Preco original < novo preco )
+        WHEN oi.price < 
+            CASE 
+                WHEN p.product_category_name = 'livros_tecnicos' THEN oi.price * 0.90
+                WHEN p.product_category_name = 'pet_shop' THEN oi.price * 0.80
+                WHEN p.product_category_name = 'pc_gamer' THEN oi.price * 1.50
+                WHEN p.product_category_name = 'tablets_impressao_imagem' THEN oi.price * 1.10
+                WHEN p.product_category_name = 'fashion_esporte' THEN oi.price * 1.05
+                ELSE oi.price
+            END 
+        THEN 'aumento' -- Se Verdadeiro vai dizer que teve aumento
+        --Comparação abaixo (Preco Original > novo preco)
+        WHEN oi.price > 
+            CASE 
+                WHEN p.product_category_name = 'livros_tecnicos' THEN oi.price * 0.90
+                WHEN p.product_category_name = 'pet_shop' THEN oi.price * 0.80
+                WHEN p.product_category_name = 'pc_gamer' THEN oi.price * 1.50
+                WHEN p.product_category_name = 'tablets_impressao_imagem' THEN oi.price * 1.10
+                WHEN p.product_category_name = 'fashion_esporte' THEN oi.price * 1.05
+                ELSE oi.price
+            END 
+        THEN 'desconto' -- Se verdadeiro vai dizer que teve desconto
+        ELSE 'normal' -- Se todas condições acima FOR FALSO vai dizer que preço está normal
+    END AS status_preco
+-- Linha ABAIXO: está Unindo Tabelas para conseguir pegar valores de preço
+FROM products p LEFT JOIN order_items oi ON (oi.product_id = p.product_id)
+-- WHERE está FILTRANDO 09 CATEGORIAS ESPECIFICA
+WHERE p.product_category_name IN ('livros_tecnicos', 
+'pc_gamer', 
+'pet_shop', 
+'fashion_esporte', 
+'tablets_impressao_imagem', 
+'perfumaria', 
+'telefonia', 
+'beleza_saude',
+'ferramentas_jardim')
+GROUP BY p.product_category_name
+ORDER BY COUNT(p.product_id) DESC
+
+
+
+
+WITH preco_calculado AS (
+    SELECT 
+        p.product_category_name,
+        COUNT(p.product_id) AS qtd_produtos,
+        oi.price AS preco_original,
+        -- Calcula o novo preço de acordo com a categoria
+        CASE 
+            WHEN p.product_category_name = 'livros_tecnicos' THEN oi.price * 0.90  -- 10% de desconto
+            WHEN p.product_category_name = 'pet_shop' THEN oi.price * 0.80         -- 20% de desconto
+            WHEN p.product_category_name = 'pc_gamer' THEN oi.price * 1.50         -- 50% de aumento
+            WHEN p.product_category_name = 'tablets_impressao_imagem' THEN oi.price * 1.10 -- 10% de aumento
+            WHEN p.product_category_name = 'fashion_esporte' THEN oi.price * 1.05  -- 5% de aumento
+            ELSE oi.price -- Sem alteração
+        END AS novo_preco
+    FROM products p 
+    LEFT JOIN order_items oi ON (oi.product_id = p.product_id)
+    WHERE p.product_category_name IN ('livros_tecnicos', 
+                                      'pc_gamer', 
+                                      'pet_shop', 
+                                      'fashion_esporte', 
+                                      'tablets_impressao_imagem', 
+                                      'perfumaria', 
+                                      'telefonia', 
+                                      'beleza_saude',
+                                      'ferramentas_jardim')
+    GROUP BY p.product_category_name
+)
+SELECT 
+    product_category_name,
+    qtd_produtos,
+    preco_original,
+    novo_preco,
+    -- Determina se houve aumento, desconto ou se o preço está normal
+    CASE 
+        WHEN preco_original < novo_preco THEN 'aumento'
+        WHEN preco_original > novo_preco THEN 'desconto'
+        ELSE 'normal'
+    END AS status_preco
+FROM preco_calculado
+ORDER BY qtd_produtos DESC;
+
+
+
+
